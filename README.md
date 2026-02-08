@@ -1,2 +1,6 @@
-# market-radar
-Real-time financial news pipeline with AI-powered filtering.  Cuts through 500+ daily headlines to surface what matters.
+# Market Radar 
+
+> Turn financial news chaos into actionable intelligence
+
+Automated pipeline that collects, filters, and ranks market-moving news 
+from multiple sources using LLM-powered analysis.
