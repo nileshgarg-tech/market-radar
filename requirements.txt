@@ -1,0 +1,7 @@
+feedparser==6.0.10
+supabase==2.3.4
+python-dotenv==1.0.1
+pydantic==2.6.1
+requests==2.31.0
+pytest==8.0.1
+openai==1.12.0
