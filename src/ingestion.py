@@ -1,6 +1,7 @@
 import feedparser
 import time
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 from typing import List, Dict, Any
 import re
 
@@ -24,22 +25,22 @@ def clean_and_truncate(text: str, sentence_limit: int = 5) -> str:
     return " ".join(sentences[:sentence_limit])
 
 
-def fetch_recent_news(minutes_back: int = 30) -> List[Dict[str, Any]]:
+def fetch_recent_news(minutes_back: int) -> List[Dict[str, Any]]:
     """Fetches articles published within the last N minutes."""
+    local_tz = ZoneInfo("America/Chicago")
     cutoff_time = datetime.now(timezone.utc) - timedelta(minutes=minutes_back)
     all_news = []
 
-    print(f"[*] Fetching news posted after: {cutoff_time.strftime('%Y-%m-%d %H:%M:%S UTC')}")
+    print(f"[*] Fetching news posted after: {cutoff_time.astimezone(local_tz).strftime('%Y-%m-%d %I:%M %p %Z')}")
 
     for source_name, url in INITIAL_FEEDS:
         try:
             print(f"    - Checking {source_name}...", end="", flush=True)
-            feed = feedparser.parse(url)
+            # Use a realistic User-Agent to prevent Reuters/SeekingAlpha from blocking
+            feed = feedparser.parse(url, agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36')
             
             count = 0
             for entry in feed.entries:
-                # Normalizing the published time
-                # Some feeds use published_parsed, others might not have it
                 published_struct = getattr(entry, 'published_parsed', None)
                 if not published_struct:
                     continue
@@ -47,7 +48,6 @@ def fetch_recent_news(minutes_back: int = 30) -> List[Dict[str, Any]]:
                 published_dt = datetime.fromtimestamp(time.mktime(published_struct), tz=timezone.utc)
                 
                 if published_dt > cutoff_time:
-                    # SMART PARSING: Try content, fallback to summary, then title
                     raw_text = ""
                     if hasattr(entry, 'content'):
                         raw_text = entry.content[0].value
@@ -56,7 +56,6 @@ def fetch_recent_news(minutes_back: int = 30) -> List[Dict[str, Any]]:
                     
                     processed_summary = clean_and_truncate(raw_text, sentence_limit=5)
                     
-                    # If the result is too short, the title might be more descriptive
                     if len(processed_summary) < 30:
                         processed_summary = entry.title
 
@@ -64,7 +63,7 @@ def fetch_recent_news(minutes_back: int = 30) -> List[Dict[str, Any]]:
                         "source": source_name,
                         "title": entry.title,
                         "url": entry.link,
-                        "published_at": published_dt,
+                        "published_at": published_dt.astimezone(local_tz),
                         "summary": processed_summary
                     })
                     count += 1
@@ -74,21 +73,21 @@ def fetch_recent_news(minutes_back: int = 30) -> List[Dict[str, Any]]:
         except Exception as e:
             print(f" ERROR: {e}")
 
-    # Sort by time, newest first
     return sorted(all_news, key=lambda x: x['published_at'], reverse=True)
 
 if __name__ == "__main__":
-    # Run for 30 minutes as per project spec
-    recent_articles = fetch_recent_news(30)
+    # Testing for the last 24 hours (1440 minutes)
+    recent_articles = fetch_recent_news(1440)
     
     if not recent_articles:
-        print("\n[OK] No news in the last 30 minutes.")
+        print("\n[OK] No news found in the specified window.")
     else:
         print("\n" + "="*50)
-        print(f"Found {len(recent_articles)} articles in last 30 mins:")
+        print(f"Found {len(recent_articles)} articles in last 24 hours:")
         print("="*50)
     
     for art in recent_articles:
         print(f"[{art['source']}] {art['title']}")
         print(f"   Link: {art['url']}")
-        print(f"   Time: {art['published_at'].strftime('%H:%M:%S UTC')}\n")
+        print(f"   Time: {art['published_at'].strftime('%I:%M %p %Z')}\n")
+
